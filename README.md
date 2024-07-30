@@ -1,6 +1,3 @@
-Here's a detailed `README.md` file for your project:
-
-
 # Curl Command Extractor
 
 This project extracts `curl` commands and their components from HTML documentation. It identifies and extracts URL variables, query parameters, data payloads, and titles from `curl` commands.
