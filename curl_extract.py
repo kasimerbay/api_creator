@@ -51,6 +51,19 @@ def param_filter(curl_command:str) -> dict:
     
     return query_params
 
+def data_filter(curl_command:str) -> dict:
+    data_params = {}
+
+    data_match = re.search(r"--data\s+'(.*?)'", curl_command)
+    if data_match:
+        data_part = data_match.group(1)
+        curl_command = curl_command.replace(data_match.group(0), '').strip()
+            
+        # Parse the data part into a dictionary
+        data_params = json.loads(data_part)
+    
+    return data_params, curl_command
+
 def read_html(path:str) -> BeautifulSoup:
     with open(path, "r", encoding="utf-8") as file:
         content = file.read()
@@ -69,6 +82,9 @@ def extract_curl(code_text:str) -> list:
         # Extract query parameters from the curl command if available
         query_params = param_filter(curl_command)
 
+        # Extract the --data part if available
+        data_params, curl_command = data_filter(curl_command)
+
         # Create a dictionary for the curl command
         curl_command_entry = {
             'curl_command': curl_command
@@ -78,6 +94,10 @@ def extract_curl(code_text:str) -> list:
         if query_params:
             curl_command_entry['query_parameters'] = query_params
 
+        # Add the data part if it exists
+        if data_params:
+            curl_command_entry['data'] = data_params
+
         # Append the dictionary to the list
         if curl_command_entry not in curl_commands_with_params and "-X " not in curl_command_entry["curl_command"]:
             curl_commands_with_params.append(curl_command_entry)
@@ -86,7 +106,7 @@ def write_curl(path:str, commands:list) -> None:
     with open(path, "w") as f:
         print(json.dumps(commands, indent=4), file=f)
 
-def create_apis(apis):
+def create_apis(apis:list) -> None:
     for api in apis:
 
         soup = read_html(path=f"../htmls/bitbucket_{api}_management.html")
