@@ -33,6 +33,7 @@ def curl_filter(code_text:str) -> str:
     curl_command = curl_command.replace("baseurl", "self.instance")
     curl_command = curl_command.replace("projectKey", "self.key")
     curl_command = curl_command.replace("repositorySlug", "self.repo_name")
+
     """
 
     return curl_command
@@ -73,10 +74,11 @@ def read_html(path:str) -> BeautifulSoup:
 
     return soup
 
-def extract_curl(code_text:str) -> list:
+def extract_curl(code_text:str, api:str) -> list:
 
     if 'curl' in code_text:
 
+        # Filter curl
         curl_command = curl_filter(code_text)
 
         # Extract query parameters from the curl command if available
@@ -85,9 +87,17 @@ def extract_curl(code_text:str) -> list:
         # Extract the --data part if available
         data_params, curl_command = data_filter(curl_command)
 
+        # Extract what curl needs as variable
+        variables = []
+
+        # Extract variables of the form /{variable}/
+        variables = re.findall(r'/{(.*?)}', curl_command)
+
         # Create a dictionary for the curl command
         curl_command_entry = {
-            'curl_command': curl_command
+            'type': api,
+            'curl_command': curl_command,
+            'variables': variables
         }
 
         # Add query parameters if they exist
@@ -113,7 +123,7 @@ def create_apis(apis:list) -> None:
 
         for code_tag in soup.find_all('code'):
             code_text = code_tag.get_text()
-            extract_curl(code_text)
+            extract_curl(code_text, api)
 
         for header in soup.find_all('h2'):
             text = header.get_text()
@@ -122,12 +132,13 @@ def create_apis(apis:list) -> None:
 
         for i in range(len(curl_commands_with_params)):
             curl_commands_with_params[i]["title"] = h2_[i]
-        """
-        """
+
+    """
+    """
 
     print(f"Total headers:{len(h2_)}")
     print(f"Total Commands:{len(curl_commands_with_params)}")
-    write_curl("curls.txt", curl_commands_with_params)
+    # write_curl("curls.txt", curl_commands_with_params)
 
 
 curl_commands_with_params = []
