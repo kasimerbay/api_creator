@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
-import json
-import re
+from itertools import chain
+from collections import defaultdict
+import json, re
 
 
 def curl_filter(code_text:str) -> str:
@@ -27,12 +28,7 @@ def curl_filter(code_text:str) -> str:
     # Add "-n" as option
     curl_command = curl_command.replace("-u username:password ", "")
     curl_command = curl_command.replace("curl ", "curl -n ")
-
-    # Create class variables
-
     
-
-
     return curl_command
 
 def param_filter(curl_command:str) -> dict:
@@ -138,52 +134,80 @@ def create_apis(apis:list) -> None:
     print(f"Total Commands:{len(curl_commands_with_params)}")
     write_curl("curls.txt", curl_commands_with_params)
 
+def generate_class_name(variable_set):
+    """Generate a class name based on a set of variables."""
+    return 'API_' + '_'.join(sorted(variable_set))
+
+def create_method_definition(command):
+    """Generate method definition from a command dictionary."""
+    method_name = command['title'].replace(' ', '_').replace('-', '_').lower()
+    method_name = re.sub(r'\W+', '', method_name)  # Remove any non-alphanumeric characters
+
+    data = command.get('data', {})
+    query_parameters = command.get('query_parameters', {})
+
+    method_definition = f"    def {method_name}(self"
+
+    if query_parameters:
+        for param in query_parameters.keys():
+            method_definition += f", {param}=None"
+    if data and isinstance(data, dict):
+        for key in data.keys():
+            method_definition += f", d_{key}=None"
+    method_definition += "):\n"
+
+    # Add the curl command with proper formatting
+    curl_command = command['curl_command'].replace("'", "\"")
+    method_definition += f"        curl_command = f'''{curl_command}'''\n"
+
+    # Print the curl command
+    method_definition += f"        return curl_command\n"
+
+    return method_definition
+
+def create_init_method(variable_set):
+    """Generate the __init__ method for the class based on the variable set."""
+    init_method = "    def __init__(self"
+    for var in variable_set:
+        init_method += f", {var}=None"
+    init_method += "):\n"
+
+    for var in variable_set:
+        init_method += f"        self.{var} = {var}\n"
+
+    return init_method
+
 def create_classes_and_methods():
+    """Create Python classes and methods from curl_commands_with_params."""
+    # Group commands by unique sets of variables
+    variable_grouped_commands = defaultdict(list)
+    
+    for command in curl_commands_with_params:
+        variable_set = frozenset(command['variables'])
+        variable_grouped_commands[variable_set].append(command)
+    
     class_definitions = {}
 
-    for command in curl_commands_with_params:
-        class_name = command['type'].capitalize() + 'API'
-        method_name = command['title'].replace(' ', '_').replace('-', '_').lower()
-        method_name = re.sub(r'\W+', '', method_name)  # Remove any non-alphanumeric characters
-
-        data = command.get('data', {})
-        query_parameters = command.get('query_parameters', {})
-
-        # Create the class definition if it doesn't exist
+    for variable_set, commands in variable_grouped_commands.items():
+        class_name = generate_class_name(variable_set)
+        
         if class_name not in class_definitions:
             class_definitions[class_name] = f"class {class_name}:\n"
+            class_definitions[class_name] += create_init_method(variable_set) + "\n"
 
-        # Add the method definition
-        method_definition = f"    def {method_name}(self"
-
-        if query_parameters:
-            for param in query_parameters.keys():
-                method_definition += f", {param}=None"
-        if data and type(data) == dict:
-            for key in data.keys():
-                method_definition += f", d_{key}=None"
-        method_definition += "):\n"
-
-        # Add the curl command
-        curl_command = command['curl_command'].replace("'", "\"")
-        method_definition += f"        curl_command = '''{curl_command}'''\n"
-
-        # Print the curl command
-        method_definition += f"        return(curl_command)\n"
-
-        class_definitions[class_name] += method_definition + "\n"
+        for command in commands:
+            method_definition = create_method_definition(command)
+            class_definitions[class_name] += method_definition + "\n"
 
     with open("classes.py", "w") as f:
-        # Execute the class definitions
         for class_def in class_definitions.values():
-            # exec(class_def)
-            print(class_def, file=f)  # Optional: print the class definition
+            print(class_def, file=f)  # Write the class definition to the file
 
 
 
 curl_commands_with_params = []
 h2_ = []
-apis = ["permission"]#, "project", "permission", "repository"]
+apis = ["permission", "project", "permission", "repository"]
 
 create_apis(apis)
 create_classes_and_methods()

@@ -1,169 +1,168 @@
-# Curl Command Extractor
 
-This project extracts `curl` commands and their components from HTML documentation. It identifies and extracts URL variables, query parameters, data payloads, and titles from `curl` commands.
+# API Command Extractor and Class Generator
 
-## Features
+This project is designed to extract `curl` commands from HTML files, clean and format them, and then generate Python classes and methods based on the extracted commands. The classes are grouped by the kind of variables used in the `curl` commands.
 
-- Parses HTML documentation to find `curl` commands.
-- Extracts URL variables of the form `{variable}`.
-- Identifies and extracts query parameters.
-- Extracts the `--data` payload from `curl` commands.
-- Associates `curl` commands with their section titles.
 
-## Requirements
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Functions](#functions)
+  - [curl_filter](#curl_filter)
+  - [param_filter](#param_filter)
+  - [data_filter](#data_filter)
+  - [read_html](#read_html)
+  - [extract_curl](#extract_curl)
+  - [write_curl](#write_curl)
+  - [create_apis](#create_apis)
+  - [generate_class_name](#generate_class_name)
+  - [create_method_definition](#create_method_definition)
+  - [create_init_method](#create_init_method)
+  - [create_classes_and_methods](#create_classes_and_methods)
+- [Example](#example)
+- [Contributing](#contributing)
+- [License](#license)
+## Prerequisites
 
 - Python 3.x
-- BeautifulSoup4
+- `BeautifulSoup` library
+- `requests` library
 
+You can install the required libraries using the following command:
+
+```sh
+python3 -m pip install beautifulsoup4 requests
+```
 ## Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/curl-command-extractor.git
-   cd curl-command-extractor
-   ```
+Clone the repository:
+```sh
+git clone https://github.com/yourusername/api-command-extractor.git
+```
 
-2. Install the required packages:
-   ```bash
-   pip install beautifulsoup4
-   ```
-
+Navigate to the project directory:
+```sh
+cd api-command-extractor
+```
+    
 ## Usage
 
-1. Save the HTML content from the webpages you want to parse as `bitbucket_{api}_management.html` in the `../htmls/` directory. The `{api}` should be replaced with the specific API section (e.g., project, permission, repository).
+Prepare your HTML files containing curl commands. Place them in a directory (e.g., htmls/).
+Update the apis list with the desired API types.
+Run the script:
 
-2. Run the script to extract `curl` commands:
-   ```bash
-   python extract_curl_commands.py
-   ```
-
-3. The script will output the extracted details in JSON format.
-
-## Script Explanation
-
-### Imports
-
-```python
-from bs4 import BeautifulSoup
-import json
-import re
+```sh
+python curl_extract.py
 ```
 
-- **BeautifulSoup**: A library for parsing HTML and XML documents.
-- **json**: A library for JSON encoding and decoding.
-- **re**: A library for working with regular expressions.
 
-### Helper Functions
+## Functions
 
-1. **`curl_filter(code_text: str) -> str`**:
-   - Cleans and formats the `curl` command.
-   - Replaces `http` with `https`.
-   - Removes unnecessary spaces and characters.
-   - Adds `-n` option for `curl`.
+### `curl_filter`
 
-2. **`param_filter(curl_command: str) -> dict`**:
-   - Extracts query parameters from the `curl` command.
-   - Returns a dictionary of query parameters.
+Filters and cleans the `curl` command.
 
-3. **`data_filter(curl_command: str) -> dict`**:
-   - Extracts the `--data` payload from the `curl` command.
-   - Returns a dictionary of data parameters and the cleaned `curl` command.
+**Parameters:**
+- `code_text` (str): The `curl` command as a string.
 
-4. **`read_html(path: str) -> BeautifulSoup`**:
-   - Reads an HTML file and parses it using BeautifulSoup.
-   - Returns the parsed BeautifulSoup object.
+**Returns:**
+- `str`: The cleaned `curl` command.
 
-5. **`extract_curl(code_text: str, api: str) -> list`**:
-   - Extracts and processes `curl` commands from the given code text.
-   - Cleans the `curl` command using `curl_filter`.
-   - Extracts query parameters using `param_filter`.
-   - Extracts data payloads using `data_filter`.
-   - Extracts variables from the URL.
-   - Creates a dictionary for each `curl` command and appends it to the `curl_commands_with_params` list if it is not already present and does not contain `-X`.
+### `param_filter`
 
-6. **`write_curl(path: str, commands: list) -> None`**:
-   - Writes the list of `curl` command dictionaries to a JSON file.
+Extracts query parameters from the `curl` command.
 
-7. **`create_apis(apis: list) -> None`**:
-   - Processes HTML files for different API sections.
-   - For each API section, reads the HTML file, extracts `curl` commands, and headers.
-   - Appends extracted `curl` command dictionaries to `curl_commands_with_params` and headers to `h2_`.
+**Parameters:**
+- `curl_command` (str): The `curl` command.
 
-### Main Code Execution
+**Returns:**
+- `dict`: A dictionary of query parameters.
 
-```python
-curl_commands_with_params = []
-h2_ = []
-apis = ["project", "permission", "repository"]
+### `data_filter`
 
-create_apis(apis)
-```
+Extracts `--data` parameters from the `curl` command.
 
-- Initializes empty lists `curl_commands_with_params` and `h2_` to store `curl` command dictionaries and headers, respectively.
-- Defines the API sections to process: project, permission, and repository.
-- Calls `create_apis` to process each API section and extract `curl` commands.
+**Parameters:**
+- `curl_command` (str): The `curl` command.
 
-### Detailed Workflow
+**Returns:**
+- `dict`: A dictionary of data parameters.
+- `str`: The cleaned `curl` command without `--data` part.
 
-1. **Reading and Parsing HTML**:
-   - The `read_html` function reads and parses HTML files for each API section using BeautifulSoup.
+### `read_html`
 
-2. **Extracting `curl` Commands**:
-   - The `create_apis` function iterates over the code tags in the parsed HTML, extracts `curl` commands using `extract_curl`, and extracts headers.
+Reads and parses an HTML file.
 
-3. **Processing `curl` Commands**:
-   - Each `curl` command is cleaned and formatted using `curl_filter`.
-   - Query parameters and data payloads are extracted using `param_filter` and `data_filter`.
-   - URL variables are extracted using regular expressions.
-   - The processed `curl` command is stored in a dictionary with the API type, `curl` command, variables, query parameters, data payloads, and titles.
+**Parameters:**
+- `path` (str): The path to the HTML file.
 
-4. **Output**:
-   - The processed `curl` command dictionaries can be written to a JSON file using `write_curl`.
-   - The script prints the total number of headers and `curl` commands extracted.
+**Returns:**
+- `BeautifulSoup`: Parsed HTML content.
 
-### Example Output
+### `extract_curl`
 
-```json
-[
-    {
-        "type": "project",
-        "curl_command": "curl -n --request PUT --url 'https://{baseurl}/rest/api/latest/projects/{projectKey}/settings/hooks/{hookKey}/settings' --header 'Accept:application/json' --header 'Content-Type:application/json'",
-        "variables": ["baseurl", "projectKey", "hookKey"],
-        "data": {
-            "booleanValue": true,
-            "doubleValue": 1.1,
-            "integerValue": 1,
-            "longValue": -2147483648,
-            "stringValue": "This is an arbitrary string"
-        },
-        "title": "Update repository hook settings"
-    },
-    ...
-]
-```
+Extracts `curl` commands from the HTML content.
 
-### Note
+**Parameters:**
+- `code_text` (str): The `curl` command as a string.
+- `api` (str): The API type.
 
-- The `write_curl` function call is commented out in the `create_apis` function.
-- The `print` statements at the end of `create_apis` show the total number of headers and commands extracted.
-- The script processes HTML files located in the `../htmls/` directory. Make sure to place your HTML files there or adjust the paths accordingly.
+### `write_curl`
 
-## Contributing
+Writes the extracted `curl` commands to a file.
 
-If you want to contribute to this project, feel free to fork the repository and submit a pull request.
+**Parameters:**
+- `path` (str): The file path to write to.
+- `commands` (list): List of `curl` commands.
 
-## License
+### `create_apis`
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Creates API commands by reading HTML files and extracting `curl` commands.
 
+**Parameters:**
+- `apis` (list): List of API types.
 
-### Steps to Follow:
+### `generate_class_name`
 
-1. **Clone the repository** and navigate to the directory.
-2. **Install the necessary dependencies**.
-3. **Prepare the HTML files** you want to parse and place them in the `../htmls/` directory.
-4. **Run the script** to extract `curl` commands.
+Generates a class name based on a set of variables.
 
-### Notes:
-- Ensure your HTML files are named as `bitbucket_{api}_management.html`, replacing `{api}` with the specific API section (e.g., project, permission, repository).
-- Adjust paths and filenames according to your project's structure if necessary.
+**Parameters:**
+- `variable_set` (set): A set of variables.
+
+**Returns:**
+- `str`: The generated class name.
+
+### `create_method_definition`
+
+Generates a method definition from a command dictionary.
+
+**Parameters:**
+- `command` (dict): The command dictionary.
+
+**Returns:**
+- `str`: The method definition.
+
+### `create_init_method`
+
+Generates the `__init__` method for the class based on the variable set.
+
+**Parameters:**
+- `variable_set` (set): A set of variables.
+
+**Returns:**
+- `str`: The `__init__` method definition.
+
+### `create_classes_and_methods`
+
+Creates Python classes and methods from `curl_commands_with_params`.
+## Appendix
+
+1. **Place HTML Files**: Place your HTML files in a directory (e.g., `htmls/`).
+2. **Update `apis` List**: Update the `apis` list with the desired API types.
+3. **Run the Script**: Execute the script to generate the classes.
+    ```sh
+    python extract_and_generate.py
+    ```
+
