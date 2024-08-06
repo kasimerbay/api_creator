@@ -29,12 +29,9 @@ def curl_filter(code_text:str) -> str:
     curl_command = curl_command.replace("curl ", "curl -n ")
 
     # Create class variables
-    """
-    curl_command = curl_command.replace("baseurl", "self.instance")
-    curl_command = curl_command.replace("projectKey", "self.key")
-    curl_command = curl_command.replace("repositorySlug", "self.repo_name")
 
-    """
+    
+
 
     return curl_command
 
@@ -90,23 +87,27 @@ def extract_curl(code_text:str, api:str) -> list:
         # Extract what curl needs as variable
         variables = []
 
-        # Extract variables of the form /{variable}/
+        # Extract variables of the form /{variable}
         variables = re.findall(r'/{(.*?)}', curl_command)
+
+        curl_command = curl_command.replace("baseurl", "self.baseurl")
+        curl_command = curl_command.replace("projectKey", "self.projectKey")
+        curl_command = curl_command.replace("repositorySlug", "self.repositorySlug")
+        curl_command = curl_command.replace("userKey", "self.userKey")
+        curl_command = curl_command.replace("hookKey", "self.hookKey")
+        curl_command = curl_command.replace("pullRequestId", "self.pullRequestId")
+        curl_command = curl_command.replace("commitId", "self.commitId")
+        curl_command = curl_command.replace("branchName", "self.branchName")
+        curl_command = curl_command.replace("issueId", "self.issueId")
 
         # Create a dictionary for the curl command
         curl_command_entry = {
             'type': api,
             'curl_command': curl_command,
-            'variables': variables
+            'variables': variables,
+            'query_parameters':query_params,
+            'data': data_params
         }
-
-        # Add query parameters if they exist
-        if query_params:
-            curl_command_entry['query_parameters'] = query_params
-
-        # Add the data part if it exists
-        if data_params:
-            curl_command_entry['data'] = data_params
 
         # Append the dictionary to the list
         if curl_command_entry not in curl_commands_with_params and "-X " not in curl_command_entry["curl_command"]:
@@ -133,16 +134,56 @@ def create_apis(apis:list) -> None:
         for i in range(len(curl_commands_with_params)):
             curl_commands_with_params[i]["title"] = h2_[i]
 
-    """
-    """
-
     print(f"Total headers:{len(h2_)}")
     print(f"Total Commands:{len(curl_commands_with_params)}")
-    # write_curl("curls.txt", curl_commands_with_params)
+    write_curl("curls.txt", curl_commands_with_params)
+
+def create_classes_and_methods():
+    class_definitions = {}
+
+    for command in curl_commands_with_params:
+        class_name = command['type'].capitalize() + 'API'
+        method_name = command['title'].replace(' ', '_').replace('-', '_').lower()
+        method_name = re.sub(r'\W+', '', method_name)  # Remove any non-alphanumeric characters
+
+        data = command.get('data', {})
+        query_parameters = command.get('query_parameters', {})
+
+        # Create the class definition if it doesn't exist
+        if class_name not in class_definitions:
+            class_definitions[class_name] = f"class {class_name}:\n"
+
+        # Add the method definition
+        method_definition = f"    def {method_name}(self"
+
+        if query_parameters:
+            for param in query_parameters.keys():
+                method_definition += f", {param}=None"
+        if data and type(data) == dict:
+            for key in data.keys():
+                method_definition += f", d_{key}=None"
+        method_definition += "):\n"
+
+        # Add the curl command
+        curl_command = command['curl_command'].replace("'", "\"")
+        method_definition += f"        curl_command = '''{curl_command}'''\n"
+
+        # Print the curl command
+        method_definition += f"        return(curl_command)\n"
+
+        class_definitions[class_name] += method_definition + "\n"
+
+    with open("classes.py", "w") as f:
+        # Execute the class definitions
+        for class_def in class_definitions.values():
+            # exec(class_def)
+            print(class_def, file=f)  # Optional: print the class definition
+
 
 
 curl_commands_with_params = []
 h2_ = []
-apis = ["project", "permission", "repository"]
+apis = ["permission"]#, "project", "permission", "repository"]
 
 create_apis(apis)
+create_classes_and_methods()
