@@ -1,8 +1,20 @@
 from bs4 import BeautifulSoup
 from itertools import chain
 from collections import defaultdict
-import json, re
+import json, re, os
 
+def read_html(path:str) -> BeautifulSoup:
+    with open(path, "r", encoding="utf-8") as file:
+        content = file.read()
+
+    # Parse the HTML content
+    soup = BeautifulSoup(content, 'html.parser')
+
+    return soup
+
+def write_curl(path:str, commands:list) -> None:
+    with open(path, "w") as f:
+        print(json.dumps(commands, indent=4), file=f)
 
 def curl_filter(code_text:str) -> str:
     # Clean the curl command
@@ -52,20 +64,20 @@ def data_filter(curl_command:str) -> dict:
     if data_match:
         data_part = data_match.group(1)
         curl_command = curl_command.replace(data_match.group(0), '').strip()
-            
+
         # Parse the data part into a dictionary
         data_params = json.loads(data_part)
     
     return data_params, curl_command
 
-def read_html(path:str) -> BeautifulSoup:
-    with open(path, "r", encoding="utf-8") as file:
-        content = file.read()
+def variables_filter(curl_command:str) -> dict:
+    # Extract what curl needs as variable
+    variables = []
 
-    # Parse the HTML content
-    soup = BeautifulSoup(content, 'html.parser')
+    # Extract variables of the form /{variable}
+    variables = re.findall(r'/{(.*?)}', curl_command)
 
-    return soup
+    return variables
 
 def extract_curl(code_text:str, api:str) -> list:
 
@@ -81,20 +93,33 @@ def extract_curl(code_text:str, api:str) -> list:
         data_params, curl_command = data_filter(curl_command)
 
         # Extract what curl needs as variable
-        variables = []
+        variables = variables_filter(curl_command)
 
-        # Extract variables of the form /{variable}
-        variables = re.findall(r'/{(.*?)}', curl_command)
+        curl_command = curl_command.replace("{baseurl}", "{self.baseurl}")
+        curl_command = curl_command.replace("{projectKey}", "{self.projectKey}")
+        curl_command = curl_command.replace("{repositorySlug}", "{self.repositorySlug}")
+        curl_command = curl_command.replace("{userKey}", "{self.userKey}")
+        curl_command = curl_command.replace("{hookKey}", "{self.hookKey}")
+        curl_command = curl_command.replace("{pullRequestId}", "{self.pullRequestId}")
+        curl_command = curl_command.replace("{commitId}", "{self.commitId}")
+        curl_command = curl_command.replace("{branchName}", "{self.branchName}")
+        curl_command = curl_command.replace("{issueId}", "{self.issueId}")
+        curl_command = curl_command.replace("{keyId}", "{self.keyId}")
+        curl_command = curl_command.replace("{permission}", "{self.permission}")
+        curl_command = curl_command.replace("{tokenId}", "{self.tokenId}")
+        curl_command = curl_command.replace("{userSlug}", "{self.userSlug}")
+        curl_command = curl_command.replace("{key}", "{self.key}")
+        curl_command = curl_command.replace("{externalId}", "{self.externalId}")
+        curl_command = curl_command.replace("{id}", "{self.id}")
+        curl_command = curl_command.replace("{attachmentId}", "{self.attachmentId}")
+        curl_command = curl_command.replace("{path}", "{self.path}")
+        curl_command = curl_command.replace("{commentId}", "{self.commentId}")
+        curl_command = curl_command.replace("{scriptId}", "{self.scriptId}")
+        curl_command = curl_command.replace("{labelName}", "{self.labelName}")
+        curl_command = curl_command.replace("{webhookId}", "{self.webhookId}")
+        curl_command = curl_command.replace("{taskId}", "{self.taskId}")
+        curl_command = curl_command.replace("{scmId}", "{self.scmId}")
 
-        curl_command = curl_command.replace("baseurl", "self.baseurl")
-        curl_command = curl_command.replace("projectKey", "self.projectKey")
-        curl_command = curl_command.replace("repositorySlug", "self.repositorySlug")
-        curl_command = curl_command.replace("userKey", "self.userKey")
-        curl_command = curl_command.replace("hookKey", "self.hookKey")
-        curl_command = curl_command.replace("pullRequestId", "self.pullRequestId")
-        curl_command = curl_command.replace("commitId", "self.commitId")
-        curl_command = curl_command.replace("branchName", "self.branchName")
-        curl_command = curl_command.replace("issueId", "self.issueId")
 
         # Create a dictionary for the curl command
         curl_command_entry = {
@@ -109,18 +134,14 @@ def extract_curl(code_text:str, api:str) -> list:
         if curl_command_entry not in curl_commands_with_params and "-X " not in curl_command_entry["curl_command"]:
             curl_commands_with_params.append(curl_command_entry)
 
-def write_curl(path:str, commands:list) -> None:
-    with open(path, "w") as f:
-        print(json.dumps(commands, indent=4), file=f)
+def create_apis(paths:list) -> None:
+    for path in paths:
 
-def create_apis(apis:list) -> None:
-    for api in apis:
-
-        soup = read_html(path=f"../htmls/bitbucket_{api}_management.html")
+        soup = read_html(path="../htmls/"+path)
 
         for code_tag in soup.find_all('code'):
             code_text = code_tag.get_text()
-            extract_curl(code_text, api)
+            extract_curl(code_text, path.split("_")[1])
 
         for header in soup.find_all('h2'):
             text = header.get_text()
@@ -132,7 +153,7 @@ def create_apis(apis:list) -> None:
 
     print(f"Total headers:{len(h2_)}")
     print(f"Total Commands:{len(curl_commands_with_params)}")
-    write_curl("curls.txt", curl_commands_with_params)
+    # write_curl("curls.txt", curl_commands_with_params)
 
 def generate_class_name(variable_set):
     """Generate a class name based on a set of variables."""
@@ -148,17 +169,20 @@ def create_method_definition(command):
 
     method_definition = f"    def {method_name}(self"
 
+    if data:
+        method_definition += ", data=None"
+
     if query_parameters:
         for param in query_parameters.keys():
             method_definition += f", {param}=None"
-    if data and isinstance(data, dict):
-        for key in data.keys():
-            method_definition += f", d_{key}=None"
+    
     method_definition += "):\n"
 
     # Add the curl command with proper formatting
     curl_command = command['curl_command'].replace("'", "\"")
-    method_definition += f"        curl_command = f'''{curl_command}'''\n"
+    if data:
+        curl_command += " --data '''{data}''' "
+    method_definition += f'        curl_command = f"""{curl_command} """ \n'
 
     # Print the curl command
     method_definition += f"        return curl_command\n"
@@ -181,7 +205,7 @@ def create_classes_and_methods():
     """Create Python classes and methods from curl_commands_with_params."""
     # Group commands by unique sets of variables
     variable_grouped_commands = defaultdict(list)
-    
+
     for command in curl_commands_with_params:
         variable_set = frozenset(command['variables'])
         variable_grouped_commands[variable_set].append(command)
@@ -204,10 +228,9 @@ def create_classes_and_methods():
             print(class_def, file=f)  # Write the class definition to the file
 
 
-
 curl_commands_with_params = []
 h2_ = []
-apis = ["permission", "project", "permission", "repository"]
+files = [f for f in os.listdir("../htmls/")]
 
-create_apis(apis)
+create_apis(files)
 create_classes_and_methods()
