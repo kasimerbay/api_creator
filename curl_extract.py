@@ -57,6 +57,41 @@ def param_filter(curl_command:str) -> dict:
     
     return query_params
 
+def curl_filter2(curl_command:str) -> str:
+    filters = {
+        "/{baseurl}":"/{self.baseurl}",
+        "/{projectKey}":"/{self.projectKey}",
+        "/{repositorySlug}":"/{self.repositorySlug}",
+        "/{userKey}":"/{self.userKey}",
+        "/{hookKey}":"/{self.hookKey}",
+        "/{pullRequestId}":"/{self.pullRequestId}",
+        "/{commitId}":"/{self.commitId}",
+        "/{branchName}":"/{self.branchName}",
+        "/{issueId}":"/{self.issueId}",
+        "/{keyId}":"/{self.keyId}",
+        "/{permission}":"/{self.permission}",
+        "/{tokenId}":"/{self.tokenId}",
+        "/{userSlug}":"/{self.userSlug}",
+        "/{key}":"/{self.key}",
+        "/{externalId}":"/{self.externalId}",
+        "/{id}":"/{self.id}",
+        "/{attachmentId}":"/{self.attachmentId}",
+        "/{path}":"/{self.path}",
+        "/{commentId}":"/{self.commentId}",
+        "/{scriptId}":"/{self.scriptId}",
+        "/{labelName}":"/{self.labelName}",
+        "/{webhookId}":"/{self.webhookId}",
+        "/{taskId}":"/{self.taskId}",
+        "/{scmId}":"/{self.scmId}",
+        "/diff{path}":"/diff{self.path}",
+        "/{name}":"/{self.name}"
+        }
+
+    for key, value in filters.items():
+        curl_command = curl_command.replace(key, value)
+
+    return curl_command
+
 def data_filter(curl_command:str) -> dict:
     data_params = {}
 
@@ -95,31 +130,7 @@ def extract_curl(code_text:str, api:str) -> list:
         # Extract what curl needs as variable
         variables = variables_filter(curl_command)
 
-        curl_command = curl_command.replace("{baseurl}", "{self.baseurl}")
-        curl_command = curl_command.replace("{projectKey}", "{self.projectKey}")
-        curl_command = curl_command.replace("{repositorySlug}", "{self.repositorySlug}")
-        curl_command = curl_command.replace("{userKey}", "{self.userKey}")
-        curl_command = curl_command.replace("{hookKey}", "{self.hookKey}")
-        curl_command = curl_command.replace("{pullRequestId}", "{self.pullRequestId}")
-        curl_command = curl_command.replace("{commitId}", "{self.commitId}")
-        curl_command = curl_command.replace("{branchName}", "{self.branchName}")
-        curl_command = curl_command.replace("{issueId}", "{self.issueId}")
-        curl_command = curl_command.replace("{keyId}", "{self.keyId}")
-        curl_command = curl_command.replace("{permission}", "{self.permission}")
-        curl_command = curl_command.replace("{tokenId}", "{self.tokenId}")
-        curl_command = curl_command.replace("{userSlug}", "{self.userSlug}")
-        curl_command = curl_command.replace("{key}", "{self.key}")
-        curl_command = curl_command.replace("{externalId}", "{self.externalId}")
-        curl_command = curl_command.replace("{id}", "{self.id}")
-        curl_command = curl_command.replace("{attachmentId}", "{self.attachmentId}")
-        curl_command = curl_command.replace("{path}", "{self.path}")
-        curl_command = curl_command.replace("{commentId}", "{self.commentId}")
-        curl_command = curl_command.replace("{scriptId}", "{self.scriptId}")
-        curl_command = curl_command.replace("{labelName}", "{self.labelName}")
-        curl_command = curl_command.replace("{webhookId}", "{self.webhookId}")
-        curl_command = curl_command.replace("{taskId}", "{self.taskId}")
-        curl_command = curl_command.replace("{scmId}", "{self.scmId}")
-
+        curl_command = curl_filter2(curl_command)
 
         # Create a dictionary for the curl command
         curl_command_entry = {
@@ -131,8 +142,8 @@ def extract_curl(code_text:str, api:str) -> list:
         }
 
         # Append the dictionary to the list
-        if curl_command_entry not in curl_commands_with_params and "-X " not in curl_command_entry["curl_command"]:
-            curl_commands_with_params.append(curl_command_entry)
+        if curl_command_entry not in curl_commands and "-X " not in curl_command_entry["curl_command"]:
+            curl_commands.append(curl_command_entry)
 
 def create_apis(paths:list) -> None:
     for path in paths:
@@ -148,12 +159,12 @@ def create_apis(paths:list) -> None:
             if text != "Manage Preferences":
                 h2_.append(text)
 
-        for i in range(len(curl_commands_with_params)):
-            curl_commands_with_params[i]["title"] = h2_[i]
+        for i in range(len(curl_commands)):
+            curl_commands[i]["title"] = h2_[i]
 
     print(f"Total headers:{len(h2_)}")
-    print(f"Total Commands:{len(curl_commands_with_params)}")
-    # write_curl("curls.txt", curl_commands_with_params)
+    print(f"Total Commands:{len(curl_commands)}")
+    # write_curl("curls.txt", curl_commands)
 
 def generate_class_name(variable_set):
     """Generate a class name based on a set of variables."""
@@ -170,11 +181,11 @@ def create_method_definition(command):
     method_definition = f"    def {method_name}(self"
 
     if data:
-        method_definition += ", data=None"
+        method_definition += ", data=dict"
 
     if query_parameters:
         for param in query_parameters.keys():
-            method_definition += f", {param}=None"
+            method_definition += f", {param}=str"
     
     method_definition += "):\n"
 
@@ -202,19 +213,19 @@ def create_init_method(variable_set):
     return init_method
 
 def create_classes_and_methods():
-    """Create Python classes and methods from curl_commands_with_params."""
+    """Create Python classes and methods from curl_commands."""
     # Group commands by unique sets of variables
     variable_grouped_commands = defaultdict(list)
 
-    for command in curl_commands_with_params:
+    for command in curl_commands:
         variable_set = frozenset(command['variables'])
         variable_grouped_commands[variable_set].append(command)
-    
+
     class_definitions = {}
 
     for variable_set, commands in variable_grouped_commands.items():
         class_name = generate_class_name(variable_set)
-        
+
         if class_name not in class_definitions:
             class_definitions[class_name] = f"class {class_name}:\n"
             class_definitions[class_name] += create_init_method(variable_set) + "\n"
@@ -228,7 +239,7 @@ def create_classes_and_methods():
             print(class_def, file=f)  # Write the class definition to the file
 
 
-curl_commands_with_params = []
+curl_commands = []
 h2_ = []
 files = [f for f in os.listdir("../htmls/")]
 
