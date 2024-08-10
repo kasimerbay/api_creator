@@ -1,5 +1,4 @@
 from bs4 import BeautifulSoup
-from itertools import chain
 from collections import defaultdict
 import json, re, os
 
@@ -181,7 +180,7 @@ def create_method_definition(command):
     method_definition = f"    def {method_name}(self"
 
     if data:
-        method_definition += ", data=dict"
+        method_definition += ", data"
 
     if query_parameters:
         for param in query_parameters.keys():
@@ -190,10 +189,10 @@ def create_method_definition(command):
     method_definition += "):\n"
 
     # Add the curl command with proper formatting
-    curl_command = command['curl_command'].replace("'", "\"")
+    curl_command = command['curl_command'].replace("\"", "'")
     if data:
-        curl_command += " --data '''{data}''' "
-    method_definition += f'        curl_command = f"""{curl_command} """ \n'
+        curl_command += " --data '{data}'"
+    method_definition += f'        curl_command = f"""{curl_command} -H "X-Atlassian-Token:no-check" """ \n'
 
     # Print the curl command
     method_definition += f"        return curl_command\n"
@@ -234,7 +233,7 @@ def create_classes_and_methods():
             method_definition = create_method_definition(command)
             class_definitions[class_name] += method_definition + "\n"
 
-    with open("classes.py", "w") as f:
+    with open("atlbitbucket.py", "w") as f:
         for class_def in class_definitions.values():
             print(class_def, file=f)  # Write the class definition to the file
 
