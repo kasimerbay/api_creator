@@ -42,20 +42,6 @@ def curl_filter(code_text:str) -> str:
     
     return curl_command
 
-def param_filter(curl_command:str) -> dict:
-    query_params = {}
-
-    if '?' in curl_command:
-        params_str = curl_command.split('?', 1)[1]
-        params_str = params_str.split(' ', 1)[0]
-        param_pairs = params_str.split('&')
-        for pair in param_pairs:
-            if '=' in pair:
-                key, value = pair.split('=')
-                query_params[key] = value
-    
-    return query_params
-
 def curl_filter2(curl_command:str) -> str:
     filters = {
         "/{baseurl}":"/{self.baseurl}",
@@ -90,6 +76,20 @@ def curl_filter2(curl_command:str) -> str:
         curl_command = curl_command.replace(key, value)
 
     return curl_command
+
+def param_filter(curl_command:str) -> dict:
+    query_params = {}
+
+    if '?' in curl_command:
+        params_str = curl_command.split('?', 1)[1]
+        params_str = params_str.split(' ', 1)[0]
+        param_pairs = params_str.split('&')
+        for pair in param_pairs:
+            if '=' in pair:
+                key, value = pair.split('=')
+                query_params[key] = value
+
+    return query_params
 
 def data_filter(curl_command:str) -> dict:
     data_params = {}
@@ -150,6 +150,7 @@ def create_apis(paths:list) -> None:
         soup = read_html(path="../htmls/"+path)
 
         for code_tag in soup.find_all('code'):
+            
             code_text = code_tag.get_text()
             extract_curl(code_text, path.split("_")[1])
 
